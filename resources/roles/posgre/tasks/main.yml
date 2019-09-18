@@ -1,0 +1,46 @@
+###################
+# PostGreSQL Database
+###################
+
+- name: Install PostGreSQL
+  yum: name={{ item }} state=present
+  with_items:
+      - postgresql-server
+      - postgresql-contrib
+      - postgresql-devel
+      - python-devel
+      - python-psycopg2
+
+- name: Initiate database
+  command: service postgresql initdb
+           creates=/var/lib/pgsql/data/postgresql.conf
+
+- name: Ensure PostgreSQL is listening on all IP
+  lineinfile: dest=/var/lib/pgsql/data/postgresql.conf
+   regexp='^#?listen_addresses\s*='
+   line="listen_addresses = '*'"
+   state=present
+  notify: restart postgresql
+
+- lineinfile: dest=/var/lib/pgsql/data/pg_hba.conf
+             regexp='host\s+all\s+all\s+127.0.0.1/32\s+ident'
+             line='host\tall\tall\t0.0.0.0/0\tmd5'
+             insertbefore=BOF
+  notify: restart postgresql
+
+- name: Start PostgreSQL and enable at boot
+  service: name=postgresql
+           enabled=yes
+           state=started
+
+- name: Create user
+  postgresql_user: name={{ user }} password={{ password }}
+  become: true
+  become_user: postgres
+  notify: restart postgresql
+
+- name: Create DB and give it to user
+  become: true
+  become_user: postgres
+  postgresql_db: name={{ database }} owner={{ user }}
+  notify: restart postgresql
