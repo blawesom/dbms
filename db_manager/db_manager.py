@@ -12,4 +12,7 @@
 
 def setup_db(public_ip, engine, name, port, user, password):
     print('installing {}'.format(engine))
+    # generating config file
+    # 
+    # deleting config file
     return True

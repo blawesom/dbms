@@ -19,22 +19,25 @@ def create_vm(profile, vmtype, storage):
     with open('resources/omi.json') as omis:
         omi_list = json.load(omis)
         image = omi_list[region]
+    try:
+        new_vm = gw.CreateVms(ImageId=image, VmType=vmtype)
+        new_vol = gw.CreateVolume(Size=storage['size'], VolumeType=storage['type'], SubregionName=region + 'a')
+        
+        #new_eip = gw.CreatePublicIp()
+        #gw.LinkPublicIp(VmId=new_vm['Vms'][0]['VmId'], PublicIp=new_eip['PublicIp']['PublicIp'])
+        
+        gw.LinkVolume(VmId=new_vm['Vms'][0]['VmId'], VolumeId=new_vol['Volume']['VolumeId'], DeviceName='/dev/xvdb')
+    except Exception as e:
+        return False, None, e
+        
+    if waitforit(gw=gw, vms=new_vm['Vms'], state='running'):
+        return True, new_vm['Vms'][0]['VmId'], None
+    return False, new_vm['Vms'][0]['VmId'], None
 
-    new_vm = gw.CreateVms(ImageId=image, VmType=vmtype)
-    new_vol = gw.CreateVolume(Size=storage['size'], VolumeType=storage['type'], SubregionName=region + 'a')
-    #new_eip = gw.CreatePublicIp()
-    
-    #gw.LinkPublicIp(VmId=new_vm['Vms'][0]['VmId'], PublicIp=new_eip['PublicIp']['PublicIp'])
-    gw.LinkVolume(VmId=new_vm['Vms'][0]['VmId'], VolumeId=new_vol['Volume']['VolumeId'], DeviceName='/dev/xvdb')
-
-    if waitforit(gw, [new_vm['Vms'][0]['VmId']], 'running'):
-        return new_vm['Vms'][0]['VmId']#, new_eip['PublicIp']['PublicIp']
-    return False#, new_eip['PublicIp']['PublicIp']
-
-def waitforit(gw, vmids, state):
+def waitforit(gw, vms, state):
     waited = 0
     while waited < TIMEOUT:
-        if not ['Fail' for vmid in vmids if gw.ReadVmsState(vmid)['VmStates'][0]['VmState'] != state]:
+        if not ['Fail' for vmid in [vm['VmId'] for vm in vms] if gw.ReadVmsState(vmid)['VmStates'][0]['VmState'] != state]:
             waited +=1
         else:
             return True
