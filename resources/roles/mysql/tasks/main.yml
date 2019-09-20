@@ -1,9 +1,9 @@
 
 - name: Get MySQL
-  get_url: url=http://repo.mysql.com/mysql-community-release-el7-5.noarch.rpm dest=/root/mysql-community-release-el7-5.noarch.rpm
+  get_url: url=http://repo.mysql.com/mysql-community-release-el7-5.noarch.rpm dest=/home/centos/mysql-community-release-el7-5.noarch.rpm
 
 - name: Install repo
-  yum: name=/root/mysql-community-release-el7-5.noarch.rpm state=present
+  yum: name=/home/centos/mysql-community-release-el7-5.noarch.rpm state=present
 
 - name: Install MySQL
   yum: name={{ item }} state=present
@@ -21,7 +21,6 @@
   with_items:
     - "{{ ansible_hostname }}"
     - 127.0.0.1
-    - 10.0.30.4
     - localhost
     - "%"
 

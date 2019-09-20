@@ -15,4 +15,4 @@ def setup_db(public_ip, engine, name, port, user, password):
     # generating config file
     # 
     # deleting config file
-    return True
+    return True, db, None

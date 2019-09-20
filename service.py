@@ -2,9 +2,7 @@
 # -*- coding: utf-8 -*-
 # __author__ = 'Benjamin'
 
-import json
 import flask
-import datetime
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -29,19 +27,23 @@ logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
 # configure log file to rotate in 5 files of 5MB
-file_handler = RotatingFileHandler('/var/log/mdbs/server_activity.log', 'a', 5000000, 5)
+# file_handler = RotatingFileHandler('/var/log/mdbs/server_activity.log', 'a', 5000000, 5)
+file_handler = RotatingFileHandler('server_activity.log', 'a', 5000000, 5)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # flask app
 app = flask.Flask(__name__)
 
+
 def handle_params(payload):
     # Handle mission parameters
-    if None in [value for key,value in payload.items() if key in MANDATORY_OPTIONS]:
-        return flask.jsonify({  'service': SERVICE,
-                                'response': 'Missing parameter: {}'.format('/'.join([key for key,value in payload.items() if value==None]))})
-        #  flask.abort(400)    # missing arguments
+    logger.debug('Handling payload: {}'.format(payload))
+    if [key for key in MANDATORY_OPTIONS if key not in payload.keys()]:
+        missing = [key for key in MANDATORY_OPTIONS if key not in payload.keys()]
+        logger.error('Missing parameters: {}'.format(missing))
+        flask.abort(400)
+        
     else:
         for key in set(list(payload.keys()) + list(DEFAULT_OPTIONS.keys())):
             if key not in payload.keys():
@@ -55,7 +57,12 @@ def status():
 
 @app.route('/api/CreateDB', methods=['POST'])
 def CreateDB():
-    payload = handle_params(flask.request.json())        
+    payload = handle_params(dict(flask.request.form))
+    logger.debug('handling request: {}'.format(payload))
+    if app.debug == True:
+        return flask.jsonify({ 'service': SERVICE,
+                                'response': payload
+                            })
 
     success, vm, error = create_vm(profile=payload['profile'], vmtype=payload['vm_type'], 
                                     storage={'type': payload['storage_type'], 'size': payload['storage_size']})
@@ -64,7 +71,7 @@ def CreateDB():
         print('Infrastructure failed')
         if error:
             return flask.jsonify({  'service': SERVICE,
-                                    'response': 'Error -> ' + str(error))})
+                                    'response': 'Error -> ' + str(error)})
         else:
             return flask.jsonify({  'service': SERVICE,
                                     'response': 'Error -> Check the vm: {} - {}'.format(vm['VmId'], vm['PublicIp'])})
@@ -73,10 +80,10 @@ def CreateDB():
                                      port=payload['port'], user=payload['user'], password=payload['password'])
 
     return flask.jsonify({  'service': SERVICE,
-                            'response': 'Success -> ' + ':'.join(vm['PublicIp'], args.port)
+                            'response': 'Success -> ' + ':'.join(vm['PublicIp'], payload['port'])})
 
 if __name__ == '__main__':
     # start application to be available from any IP on port 80
-    # used only when server.py is directly called
+    # used only when service.py is directly called
     # all other configuration has been moved to be imported in the package
-    app.run(host='127.0.0.1', port=8080)
+    app.run(host='127.0.0.1', port=8080, debug=True)
