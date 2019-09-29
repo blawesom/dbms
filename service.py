@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # __author__ = 'Benjamin'
 
+import os
 import logging
 from logging.handlers import RotatingFileHandler
 import secrets
@@ -25,6 +26,28 @@ DEFAULT_OPTIONS = { 'profile': 'default',
 
 MANDATORY_OPTIONS = ['db_name', 'username', 'password']
 
+# logger declaration
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+# configure log file to rotate in 5 files of 5MB
+file_handler = RotatingFileHandler('dbms_activity.log', 'a', 5000000, 5)
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# local service db
+engine = create_engine('sqlite:///dbms.db')
+if not os.path.isfile('dbms.db'):
+    Base.metadata.create_all(engine)
+
+Session = sessionmaker(bind=engine)
+session = Session()
+
+# flask app
+app = flask.Flask(__name__)
+
+
 def handle_params(payload):
     # Handle mission parameters
     logger.debug('Handling payload: {}'.format(payload))
@@ -38,11 +61,13 @@ def handle_params(payload):
                 payload[key] = DEFAULT_OPTIONS[key]
         return payload
 
+
 def register_new_service(vm_id, vm_ip, vm_port):
     service_id = 'db-{}'.format(secrets.token_hex(4))
     while entry_exists(session=session, service_id=service_id):
         service_id = 'db-{}'.format(secrets.token_hex(4))
-    if create_entry(session=session, vm_id=vm_id, public_ip=vm_ip, service_id=service_id, public_port=vm_port):
+        logger.info('Managing service creation: {}'.format(service_id))
+    if create_entry(session=session, vm_id=vm_id, public_ip=vm_ip, service_id=service_id, public_port=vm_port, engine=payload['engine']):
         return service_id
     else:
         flask.abort(400, description="Error when creating service")
@@ -65,7 +90,7 @@ def create_db():
         flask.abort(400, description=str(error))
     if not success:
         return flask.jsonify({'service': SERVICE,
-                              'response': 'unsuccessful'})
+                              'response': 'unsuccessful operation'})
         
     payload['vm_ip'] = vm['Nics'][0]['LinkPublicIp']['PublicIp']
     payload['vm_id'] = vm['VmId']
@@ -84,33 +109,19 @@ def create_db():
 @app.route('/api/ReadDB', methods=['GET, POST'])
 @app.route('/api/ReadDB/<service_id>', methods=['GET'])
 def get_db(service_id=None):
+    payload={}
     if flask.request.method == 'POST':
-    elif flask.request.method == 'GET':
-        if service_id:
-        else:
+        service_id = flask.request.json.get(service_id, None)
 
-    return
+    if service_id:
+        return flask.jsonify({'service': SERVICE,
+                              'response': session.query(DBService).filter_by(service_id=service_id).all()})
+    
+    return flask.jsonify({'service': SERVICE,
+                          'response': session.query(DBService).all()})
+
 
 if __name__ == '__main__':
-    # logger declaration
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-
-    # configure log file to rotate in 5 files of 5MB
-    file_handler = RotatingFileHandler('dbms_activity.log', 'a', 5000000, 5)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-
-    # local service db
-    engine = create_engine('sqlite:///dbms.db')
-    if not os.path.isfile('dbms.db'):
-        Base.metadata.create_all(engine)
-
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
-    # flask app
-    app = flask.Flask(__name__)
+    logger.debug(str(app.url_map))
     app.run(host='127.0.0.1', port=8080, debug=True)
     

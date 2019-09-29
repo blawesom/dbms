@@ -45,12 +45,10 @@ def waitforit(gw, vms, state):
     while waited < TIMEOUT:
         req_vm_list = gw.ReadVmsState(AllVms=True, Filters={'VmIds': [vm['VmId'] for vm in vms]})
         vm_list = req_vm_list['VmStates']
-        # print('\nRequestId: {}\n Result: {}\n'.format(req_vm_list['ResponseContext']['RequestId'], vm_list))
 
         if not vm_list:
             return False
         if len([vm for vm in vm_list if vm['VmState'] != state]):
-            # print('waiting for: {} ({})'.format(vm_list, waited))
             time.sleep(1)
             waited +=1
         else:

@@ -11,6 +11,7 @@ class DBService(Base):
     __tablename__ = 'db_services'
     id = Column(Integer, primary_key=True)
     sqlite_autoincrement = True
+    db_engine = Column(String)
     vm_id = Column(String)
     public_ip = Column(String)
     service_id = Column(String)
@@ -18,17 +19,17 @@ class DBService(Base):
     state = Column(String, default='pending')
 
 
-def entry_exists(session, service_id)
-    if session.query(Service).filter_by(service_id=service_id).first():
+def entry_exists(session, service_id):
+    if session.query(DBService).filter_by(service_id=service_id).first():
         return True
     return False
 
 
-def create_entry(session, vm_id, public_ip, service_id, public_port):
+def create_entry(session, vm_id, public_ip, service_id, public_port, db_engine):
     if not entry_exists(session, service_id):
-        new_service = DBService(vm_id, public_ip, service_id, public_port)
+        new_service = DBService(vm_id=vm_id, public_ip=public_ip, service_id=service_id, public_port=int(public_port), db_engine=db_engine)
         session.add(new_service)
         session.commit()
         return True
     else:
-        return True
+        return False
