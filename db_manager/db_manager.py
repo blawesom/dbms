@@ -2,17 +2,26 @@
 # -*- coding: utf-8 -*-
 # __author__ = 'Benjamin'
 
-
-# help
-# https://stackoverflow.com/questions/27590039/running-ansible-playbook-using-python-api
-# Check Saltstack call from python program
-# Check existing salt pillars ?
-
-# import ansible.runner
+from ansible_subprocess import run_playbook
 
 def setup_db(public_ip, engine, name, port, user, password):
-    print('installing {}'.format(engine))
-    # generating config file
-    # 
-    # deleting config file
-    return True, db, None
+
+    keypair = 'db_manager_key.rsa'
+    playbook_file = 'resources/{}.yml'.format(engine)
+    setup_vars = {'user': user, 'password': password, 'database': name}
+    
+    success, result = run_playbook(playbook_filename=playbook_file, hosts= public_ip,
+                                    private_key=keypair, extra_vars=setup_vars, extra_options='--timeout 60')
+    
+    if not success:
+        if isinstance(result, Exception):
+            print(result)
+            error, result = result, None
+        else:
+            print(type(result))
+            print(result.__dict__)
+            result, error = result, None
+    
+        return success, result, error
+        
+    return success, result, None

@@ -1,17 +1,21 @@
-# Homemade RDS-like
+# Managed DataBase Service
 
-## Prereqs
+## Requirements
 
-Install osc-sdk-python and prepare credentials
+https://github.com/blawesom/ansible-subprocess
+https://github.com/outscale/osc-sdk-python
 
 ## Usage
 
 Example:
-> python3 main.py --engine mysql --db mydb --user benjamin --password haxorpassword
+> python3 service.py
+
+You can query through:
+> curl -d '{"username":"benjamin", "password":"haxorpassword", "db_name":"mydb"}' -H "Content-Type: application/json" -X POST localhost:8080/api/CreateDB
 
 ___options & default value___:
 
-- vmtype: tinav4.c2r4
+- vmtype: tinav5.c2r4
 - storagesize: 100 (in GB)
 - storagetype: gp2
 - engine: mysql

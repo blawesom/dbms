@@ -19,7 +19,7 @@
 - name: Add user
   mysql_user: name={{ user }} password={{ password }} priv=*.*:ALL state=present host={{ item }}
   with_items:
-    - "{{ ansible_hostname }}"
+    #- "{{ ansible_hostname }}"
     - 127.0.0.1
     - localhost
     - "%"

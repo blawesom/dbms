@@ -2,39 +2,28 @@
 # -*- coding: utf-8 -*-
 # __author__ = 'Benjamin'
 
-import flask
 import logging
 from logging.handlers import RotatingFileHandler
-
+import secrets
+import flask
+import zmq
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from models import DBService, Base, entry_exists, create_entry
 from vm_manager import create_vm
-from db_manager import setup_db
 
 SERVICE = { 'name': 'mdbs - managed database service',
             'version': 'alpha 0.1'}
 
 DEFAULT_OPTIONS = { 'profile': 'default',
                     'engine': 'mysql',
-                    'port': 3306,
+                    'port': 3306, #5432 for posgre
                     'vm_type': 'tinav5.c2r4',
                     'storage_type': 'gp2',
                     'storage_size': 100
                 }
+
 MANDATORY_OPTIONS = ['db_name', 'username', 'password']
-
-# logger declaration
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-
-# configure log file to rotate in 5 files of 5MB
-# file_handler = RotatingFileHandler('/var/log/mdbs/server_activity.log', 'a', 5000000, 5)
-file_handler = RotatingFileHandler('server_activity.log', 'a', 5000000, 5)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-# flask app
-app = flask.Flask(__name__)
-
 
 def handle_params(payload):
     # Handle mission parameters
@@ -42,48 +31,86 @@ def handle_params(payload):
     if [key for key in MANDATORY_OPTIONS if key not in payload.keys()]:
         missing = [key for key in MANDATORY_OPTIONS if key not in payload.keys()]
         logger.error('Missing parameters: {}'.format(missing))
-        flask.abort(400)
-        
+        flask.abort(400, description="Required parameter is missing")
     else:
         for key in set(list(payload.keys()) + list(DEFAULT_OPTIONS.keys())):
             if key not in payload.keys():
                 payload[key] = DEFAULT_OPTIONS[key]
         return payload
 
-@app.route('/api/status', methods=['GET'])
+def register_new_service(vm_id, vm_ip, vm_port):
+    service_id = 'db-{}'.format(secrets.token_hex(4))
+    while entry_exists(session=session, service_id=service_id):
+        service_id = 'db-{}'.format(secrets.token_hex(4))
+    if create_entry(session=session, vm_id=vm_id, public_ip=vm_ip, service_id=service_id, public_port=vm_port):
+        return service_id
+    else:
+        flask.abort(400, description="Error when creating service")
+
+
+@app.route('/api', methods=['GET'], strict_slashes=False)
 def status():
-    return flask.jsonify({  'service': SERVICE,
-                            'response': 'service alive'})
+    return flask.jsonify({  'service': SERVICE })
+
 
 @app.route('/api/CreateDB', methods=['POST'])
-def CreateDB():
-    payload = handle_params(dict(flask.request.form))
+def create_db():
+    payload = handle_params(dict(flask.request.json))
     logger.debug('handling request: {}'.format(payload))
-    if app.debug == True:
-        return flask.jsonify({ 'service': SERVICE,
-                                'response': payload
-                            })
 
-    success, vm, error = create_vm(profile=payload['profile'], vmtype=payload['vm_type'], 
+    success, vm, error = create_vm(profile=payload['profile'], vmtype=payload['vm_type'],
                                     storage={'type': payload['storage_type'], 'size': payload['storage_size']})
 
-    if success==False:
-        print('Infrastructure failed')
-        if error:
-            return flask.jsonify({  'service': SERVICE,
-                                    'response': 'Error -> ' + str(error)})
+    if error:
+        flask.abort(400, description=str(error))
+    if not success:
+        return flask.jsonify({'service': SERVICE,
+                              'response': 'unsuccessful'})
+        
+    payload['vm_ip'] = vm['Nics'][0]['LinkPublicIp']['PublicIp']
+    payload['vm_id'] = vm['VmId']
+    payload['service_id'] = register_new_service(vm_id=payload['vm_id'], vm_ip=payload['vm_ip'], vm_port=payload['port'])
+
+    # fork setup of VM to queue
+
+    return flask.jsonify({'service': SERVICE,
+                          'response': {
+                          'db': {'Public_Ip': payload['vm_ip'],
+                                 'Public_Port': payload['port'],
+                                 'Service_Id': payload['service_id'],
+                                 'State': 'pending'}}})
+
+
+@app.route('/api/ReadDB', methods=['GET, POST'])
+@app.route('/api/ReadDB/<service_id>', methods=['GET'])
+def get_db(service_id=None):
+    if flask.request.method == 'POST':
+    elif flask.request.method == 'GET':
+        if service_id:
         else:
-            return flask.jsonify({  'service': SERVICE,
-                                    'response': 'Error -> Check the vm: {} - {}'.format(vm['VmId'], vm['PublicIp'])})
 
-    success, db, error = setup_db(public_ip=vm['PublicIp'], engine=payload['engine'], name=payload['db_name'],
-                                     port=payload['port'], user=payload['user'], password=payload['password'])
-
-    return flask.jsonify({  'service': SERVICE,
-                            'response': 'Success -> ' + ':'.join(vm['PublicIp'], payload['port'])})
+    return
 
 if __name__ == '__main__':
-    # start application to be available from any IP on port 80
-    # used only when service.py is directly called
-    # all other configuration has been moved to be imported in the package
+    # logger declaration
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+    # configure log file to rotate in 5 files of 5MB
+    file_handler = RotatingFileHandler('dbms_activity.log', 'a', 5000000, 5)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+    # local service db
+    engine = create_engine('sqlite:///dbms.db')
+    if not os.path.isfile('dbms.db'):
+        Base.metadata.create_all(engine)
+
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    # flask app
+    app = flask.Flask(__name__)
     app.run(host='127.0.0.1', port=8080, debug=True)
+    
