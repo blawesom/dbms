@@ -10,8 +10,13 @@ https://github.com/outscale/osc-sdk-python
 Example:
 > python3 service.py
 
-You can query through:
+You can create a dbservice through:
 > curl -d '{"username":"benjamin", "password":"haxorpassword", "db_name":"mydb"}' -H "Content-Type: application/json" -X POST localhost:8080/api/CreateDB
+
+And describe is different ways:
+> curl localhost:8080/ReadDB
+> curl localhost:8080/db-42bd992a
+> curl -d '{"service_id":"db-42bd992a"}' -H "Content-Type: application/json" -X POST localhost:8080/api/ReadDB
 
 ___options & default value___:
 

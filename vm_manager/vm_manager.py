@@ -26,9 +26,6 @@ def create_vm(profile, vmtype, storage):
         new_vm = gw.CreateVms(ImageId=image, VmType=vmtype, KeypairName='db_manager_key')['Vms'][0]
         new_vol = gw.CreateVolume(Size=storage['size'], VolumeType=storage['type'], SubregionName=region + 'a')
 
-        #new_eip = gw.CreatePublicIp()
-        #gw.LinkPublicIp(VmId=new_vm['Vms'][0]['VmId'], PublicIp=new_eip['PublicIp']['PublicIp'])
-
         gw.LinkVolume(VmId=new_vm['VmId'], VolumeId=new_vol['Volume']['VolumeId'], DeviceName='/dev/xvdb')
     except Exception as errorExcept:
         return False, None, errorExcept

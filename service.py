@@ -12,6 +12,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from models import DBService, Base, entry_exists, create_entry
 from vm_manager import create_vm
+from flask_caching import Cache
+
 
 SERVICE = { 'name': 'mdbs - managed database service',
             'version': 'alpha 0.1'}
@@ -45,7 +47,10 @@ Session = sessionmaker(bind=engine)
 session = Session()
 
 # flask app
+cache = Cache(config={'CACHE_TYPE': 'simple'})
+
 app = flask.Flask(__name__)
+cache.init_app(app)
 
 
 def handle_params(payload):
@@ -62,12 +67,12 @@ def handle_params(payload):
         return payload
 
 
-def register_new_service(vm_id, vm_ip, vm_port):
+def register_new_service(vm_id, vm_ip, vm_port, engine):
     service_id = 'db-{}'.format(secrets.token_hex(4))
     while entry_exists(session=session, service_id=service_id):
         service_id = 'db-{}'.format(secrets.token_hex(4))
         logger.info('Managing service creation: {}'.format(service_id))
-    if create_entry(session=session, vm_id=vm_id, public_ip=vm_ip, service_id=service_id, public_port=vm_port, engine=payload['engine']):
+    if create_entry(session=session, vm_id=vm_id, public_ip=vm_ip, service_id=service_id, public_port=vm_port, db_engine=engine):
         return service_id
     else:
         flask.abort(400, description="Error when creating service")
@@ -78,7 +83,7 @@ def status():
     return flask.jsonify({  'service': SERVICE })
 
 
-@app.route('/api/CreateDB', methods=['POST'])
+@app.route('/api/CreateDB', methods=['POST'], strict_slashes=False)
 def create_db():
     payload = handle_params(dict(flask.request.json))
     logger.debug('handling request: {}'.format(payload))
@@ -92,9 +97,10 @@ def create_db():
         return flask.jsonify({'service': SERVICE,
                               'response': 'unsuccessful operation'})
         
-    payload['vm_ip'] = vm['Nics'][0]['LinkPublicIp']['PublicIp']
+    # payload['vm_ip'] = vm['Nics'][0]['LinkPublicIp']['PublicIp']
+    payload['vm_ip'] = vm['PublicIp']
     payload['vm_id'] = vm['VmId']
-    payload['service_id'] = register_new_service(vm_id=payload['vm_id'], vm_ip=payload['vm_ip'], vm_port=payload['port'])
+    payload['service_id'] = register_new_service(vm_id=payload['vm_id'], vm_ip=payload['vm_ip'], vm_port=payload['port'], engine=payload['engine'])
 
     # fork setup of VM to queue
 
@@ -106,19 +112,18 @@ def create_db():
                                  'State': 'pending'}}})
 
 
-@app.route('/api/ReadDB', methods=['GET, POST'])
+@cache.cached(timeout=30)
+@app.route('/api/ReadDB', methods=['GET', 'POST'], strict_slashes=False)
 @app.route('/api/ReadDB/<service_id>', methods=['GET'])
 def get_db(service_id=None):
-    payload={}
     if flask.request.method == 'POST':
-        service_id = flask.request.json.get(service_id, None)
-
+        return flask.jsonify({'service': SERVICE,
+                              'response': [db.as_dict() for db in session.query(DBService).filter_by(service_id=flask.request.json.get("service_id", None)).all()]})
     if service_id:
         return flask.jsonify({'service': SERVICE,
-                              'response': session.query(DBService).filter_by(service_id=service_id).all()})
-    
+                              'response': [db.as_dict() for db in session.query(DBService).filter_by(service_id=service_id).all()]})
     return flask.jsonify({'service': SERVICE,
-                          'response': session.query(DBService).all()})
+                          'response': [db.as_dict() for db in session.query(DBService).all()]})
 
 
 if __name__ == '__main__':
