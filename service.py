@@ -3,6 +3,7 @@
 # __author__ = 'Benjamin'
 
 import os
+import json
 import logging
 from logging.handlers import RotatingFileHandler
 import secrets
@@ -14,6 +15,8 @@ from models import DBService, Base, entry_exists, create_entry
 from vm_manager import create_vm
 from flask_caching import Cache
 
+# DEBUG_MAP = {'DEBUG': 10,
+#              'PRODUCTION': 20}
 
 SERVICE = { 'name': 'mdbs - managed database service',
             'version': 'alpha 0.1'}
@@ -38,6 +41,11 @@ file_handler = RotatingFileHandler('dbms_activity.log', 'a', 5000000, 5)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
+# configure queue service
+context = zmq.Context()
+socket = context.socket(zmq.PUSH)
+socket.connect("tcp://localhost:5555")
+
 # local service db
 engine = create_engine('sqlite:///dbms.db')
 if not os.path.isfile('dbms.db'):
@@ -46,7 +54,7 @@ if not os.path.isfile('dbms.db'):
 Session = sessionmaker(bind=engine)
 session = Session()
 
-# flask app
+# flask app & cache
 cache = Cache(config={'CACHE_TYPE': 'simple'})
 
 app = flask.Flask(__name__)
@@ -89,7 +97,7 @@ def create_db():
     logger.debug('handling request: {}'.format(payload))
 
     success, vm, error = create_vm(profile=payload['profile'], vmtype=payload['vm_type'],
-                                    storage={'type': payload['storage_type'], 'size': payload['storage_size']})
+                                    storage={'type': payload['storage_type'], 'size': payload['storage_size']}, omi=payload['engine'])
 
     if error:
         flask.abort(400, description=str(error))
@@ -103,6 +111,7 @@ def create_db():
     payload['service_id'] = register_new_service(vm_id=payload['vm_id'], vm_ip=payload['vm_ip'], vm_port=payload['port'], engine=payload['engine'])
 
     # fork setup of VM to queue
+    socket.send_json(payload)
 
     return flask.jsonify({'service': SERVICE,
                           'response': {

@@ -8,7 +8,7 @@ from osc_sdk_python import Gateway
 
 TIMEOUT=60
 
-def create_vm(profile, vmtype, storage):
+def create_vm(profile, vmtype, storage, omi):
     gw = Gateway(**{'profile': profile})
     
     with open('/Users/benjaminlaplane/.oapi_credentials') as creds:
@@ -16,7 +16,7 @@ def create_vm(profile, vmtype, storage):
         region = credentials[profile]['region']
     with open('config/omi.json') as omis:
         omi_list = json.load(omis)
-        image = omi_list[region]
+        image = omi_list[region][omi]
     try:
         if 'db_manager_key' not in [key['KeypairName'] for key in gw.ReadKeypairs()['Keypairs']] :
             new_keypair = gw.CreateKeypair(KeypairName='db_manager_key')

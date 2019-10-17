@@ -1,15 +1,8 @@
+###################
+# MySQL Database
+###################
 
-- name: Get MySQL
-  get_url: url=http://repo.mysql.com/mysql-community-release-el7-5.noarch.rpm dest=/home/centos/mysql-community-release-el7-5.noarch.rpm
-
-- name: Install repo
-  yum: name=/home/centos/mysql-community-release-el7-5.noarch.rpm state=present
-
-- name: Install MySQL
-  yum: name={{ item }} state=present
-  with_items:
-    - mysql-community-server
-    - MySQL-python
+# http://repo.mysql.com/mysql80-community-release-el7-3.noarch.rpm
 
 - name: Start MySQL
   service: name=mysqld
@@ -26,3 +19,4 @@
 
 - name: Create databse
   mysql_db: name={{ database }} state=present
+  notify: restart mysql

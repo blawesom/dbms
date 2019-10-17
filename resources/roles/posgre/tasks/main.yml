@@ -2,15 +2,6 @@
 # PostGreSQL Database
 ###################
 
-- name: Install PostGreSQL
-  yum: name={{ item }} state=present
-  with_items:
-      - postgresql-server
-      - postgresql-contrib
-      - postgresql-devel
-      - python-devel
-      - python-psycopg2
-
 - name: Initiate database
   command: service postgresql initdb
            creates=/var/lib/pgsql/data/postgresql.conf
