@@ -36,3 +36,12 @@ def create_entry(session, vm_id, public_ip, service_id, public_port, db_engine):
         return True
     else:
         return False
+
+
+def delete_entry(session, service_id):
+    if entry_exists(session, service_id):
+        to_delete = session.query(DBService).filter_by(service_id=service_id).first()
+        session.delete(to_delete)
+        session.commit()
+        return to_delete
+    return {}

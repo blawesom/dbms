@@ -8,11 +8,11 @@ import logging
 from logging.handlers import RotatingFileHandler
 import secrets
 import flask
-import zmq
+import subprocess
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import DBService, Base, entry_exists, create_entry
-from vm_manager import create_vm
+from models import DBService, Base, entry_exists, create_entry, delete_entry
+from vm_manager import create_vm, delete_vm
 from flask_caching import Cache
 
 # DEBUG_MAP = {'DEBUG': 10,
@@ -40,11 +40,6 @@ formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 file_handler = RotatingFileHandler('dbms_activity.log', 'a', 5000000, 5)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
-
-# configure queue service
-context = zmq.Context()
-socket = context.socket(zmq.PUSH)
-socket.connect("tcp://localhost:5555")
 
 # local service db
 engine = create_engine('sqlite:///dbms.db')
@@ -110,14 +105,16 @@ def create_db():
     payload['vm_id'] = vm['VmId']
     payload['service_id'] = register_new_service(vm_id=payload['vm_id'], vm_ip=payload['vm_ip'], vm_port=payload['port'], engine=payload['engine'])
 
-    # fork setup of VM to queue
-    socket.send_json(payload)
+    # fork setup of VM
+    subprocess.Popen('python3 db_worker.py -ip {} -eng {} -db {} -port {} -user {} -pass {}\
+                    '.format(payload['vm_ip'], payload['engine'], payload['port'], payload['user'], payload['password']))
 
     return flask.jsonify({'service': SERVICE,
                           'response': {
                           'db': {'Public_Ip': payload['vm_ip'],
                                  'Public_Port': payload['port'],
                                  'Service_Id': payload['service_id'],
+                                 'Engine': payload['engine'],
                                  'State': 'pending'}}})
 
 
@@ -133,6 +130,21 @@ def get_db(service_id=None):
                               'response': [db.as_dict() for db in session.query(DBService).filter_by(service_id=service_id).all()]})
     return flask.jsonify({'service': SERVICE,
                           'response': [db.as_dict() for db in session.query(DBService).all()]})
+
+
+@app.route('/api/DeleteDB', methods=['POST'], strict_slashes=False)
+@app.route('/api/DeleteDB/<service_id>', methods=['GET'])
+def delete_db(service_id=None):
+    if flask.request.method == 'POST':
+        service_id = flask.request.json.get("service_id", None)
+
+    if not service_id:
+        flask.abort(400, description="Invalid parameter")
+    result = delete_entry(session, service_id).as_dict()
+    if result:
+        delete_vm(profile=DEFAULT_OPTIONS['profile'], vm_id=result['vm_id'])
+        return flask.jsonify({'service': SERVICE})
+    return flask.abort(500)
 
 
 if __name__ == '__main__':
