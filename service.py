@@ -98,7 +98,7 @@ def create_db():
         flask.abort(400, description=str(error))
     if not success:
         return flask.jsonify({'service': SERVICE,
-                              'response': 'unsuccessful operation'})
+                              'response': 'Unsuccessful operation'})
         
     # payload['vm_ip'] = vm['Nics'][0]['LinkPublicIp']['PublicIp']
     payload['vm_ip'] = vm['PublicIp']
@@ -140,16 +140,20 @@ def delete_db(service_id=None):
 
     if not service_id:
         flask.abort(400, description="Invalid parameter")
-    result = delete_entry(session, service_id)
-    if result:
-        logger.debug('deleteing {}'.format(result['vm_id']))
-        try:
-            delete_vm(profile=DEFAULT_OPTIONS['profile'], vm_id=result['vm_id'])
-        except:
-            pass
-        return flask.jsonify({'service': SERVICE})
-    return flask.abort(500)
 
+    entry = session.query(DBService).filter_by(service_id=service_id).first()
+    if not entry:
+        return flask.jsonify({'service': SERVICE,
+                        'response': 'Invalid resource id'})
+    logger.debug('deleting {}'.format(entry.as_dict()['vm_id']))
+
+    if delete_vm(profile=DEFAULT_OPTIONS['profile'], vm_id=entry.as_dict()['vm_id']):
+        delete_entry(session, service_id)
+        return flask.jsonify({'service': SERVICE})
+    else:
+        return flask.jsonify({'service': SERVICE,
+                        'response': 'Unsuccessful operation'})
+    
 
 if __name__ == '__main__':
     logger.debug(str(app.url_map))

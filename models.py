@@ -43,5 +43,5 @@ def delete_entry(session, service_id):
         to_delete = session.query(DBService).filter_by(service_id=service_id).first()
         session.delete(to_delete)
         session.commit()
-        return to_delete
-    return {}
+        return True
+    return False

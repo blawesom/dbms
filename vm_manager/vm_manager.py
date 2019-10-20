@@ -39,8 +39,12 @@ def create_vm(profile, vmtype, storage, omi):
 
 def delete_vm(profile, vm_id):
     gw = Gateway(**{'profile': profile})
-    gw.DeleteVm(VmId=vm_id)
-    return True
+    try:
+        if vm_id in [vm['VmId'] for vm in gw.ReadVms()['Vms']]:
+            gw.DeleteVms(VmIds=[vm_id])
+        return True
+    except:
+        return False
 
 
 def waitforit(gw, vms, state):
