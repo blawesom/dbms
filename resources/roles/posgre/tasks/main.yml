@@ -1,6 +1,12 @@
 ###################
 # PostGreSQL Database
 ###################
+###################
+# PostGreSQL Database
+###################
+
+- name: Install PostGreSQL
+  yum: name: ['postgresql-server', 'postgresql-contrib',' postgresql-devel', 'python-devel', 'python-psycopg2'] state=present
 
 - name: Initiate database
   command: service postgresql initdb

@@ -6,3 +6,4 @@ venv/
 *.log
 *.rsa
 *.db
+inventory

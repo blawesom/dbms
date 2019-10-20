@@ -1,1 +1,1 @@
-from .vm_manager import create_vm
+from .vm_manager import create_vm, delete_vm

@@ -4,6 +4,15 @@
 
 # http://repo.mysql.com/mysql80-community-release-el7-3.noarch.rpm
 
+- name: Get MySQL
+  get_url: url=http://repo.mysql.com/mysql-community-release-el7-5.noarch.rpm dest=/root/mysql-community-release-el7-5.noarch.rpm
+
+- name: Install repo
+  yum: name=/root/mysql-community-release-el7-5.noarch.rpm state=present
+
+- name: Install MySQL
+  yum: name: ['mysql-community-server', 'MySQL-python'] state=present
+
 - name: Start MySQL
   service: name=mysqld
            enabled=yes
@@ -12,7 +21,6 @@
 - name: Add user
   mysql_user: name={{ user }} password={{ password }} priv=*.*:ALL state=present host={{ item }}
   with_items:
-    #- "{{ ansible_hostname }}"
     - 127.0.0.1
     - localhost
     - "%"

@@ -43,7 +43,6 @@ def delete_vm(profile, vm_id):
     return True
 
 
-
 def waitforit(gw, vms, state):
     waited = 0
     while waited < TIMEOUT:

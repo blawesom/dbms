@@ -107,7 +107,7 @@ def create_db():
 
     # fork setup of VM
     subprocess.Popen('python3 db_worker.py -ip {} -eng {} -db {} -port {} -user {} -pass {}\
-                    '.format(payload['vm_ip'], payload['engine'], payload['port'], payload['user'], payload['password']))
+                    '.format(payload['vm_ip'], payload['engine'], payload['db_name'], payload['port'], payload['username'], payload['password']))
 
     return flask.jsonify({'service': SERVICE,
                           'response': {
@@ -140,9 +140,13 @@ def delete_db(service_id=None):
 
     if not service_id:
         flask.abort(400, description="Invalid parameter")
-    result = delete_entry(session, service_id).as_dict()
+    result = delete_entry(session, service_id)
     if result:
-        delete_vm(profile=DEFAULT_OPTIONS['profile'], vm_id=result['vm_id'])
+        logger.debug('deleteing {}'.format(result['vm_id']))
+        try:
+            delete_vm(profile=DEFAULT_OPTIONS['profile'], vm_id=result['vm_id'])
+        except:
+            pass
         return flask.jsonify({'service': SERVICE})
     return flask.abort(500)
 

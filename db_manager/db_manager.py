@@ -10,7 +10,10 @@ def setup_db(public_ip, engine, name, port, user, password):
     playbook_file = 'resources/{}.yml'.format(engine)
     setup_vars = {'user': user, 'password': password, 'database': name}
     
-    success, result = run_playbook(playbook_filename=playbook_file, hosts= public_ip,
+    with open('inventory', 'w') as inv:
+        inv.write(public_ip)
+    
+    success, result = run_playbook(playbook_filename=playbook_file, hosts='inventory',
                                     private_key=keypair, extra_vars=setup_vars)#, extra_options='--timeout 60')
     
     if not success:
