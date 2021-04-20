@@ -1,5 +1,5 @@
 osc-sdk-python==0.9.13
-ansible==2.8.5
+ansible==2.9.20
 ansible-subprocess==0.4.0
 Flask==1.1.1
 Flask-Caching==1.7.2
